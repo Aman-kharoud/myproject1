@@ -1,0 +1,34 @@
+name: Build sideloadable IPA
+on:
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  ipa:
+    runs-on: macos-latest
+    timeout-minutes: 25
+    defaults:
+      run:
+        working-directory: TVDrop
+    steps:
+      - uses: actions/checkout@v4
+      - name: Extract project
+        working-directory: .
+        run: unzip -q TVDrop-iOS-Project.zip
+      - name: Test transfer code
+        run: swift test
+      - name: Build iPhone app
+        run: xcodebuild -project TVDrop.xcodeproj -scheme TVDrop -configuration Release -sdk iphoneos -destination 'generic/platform=iOS' -derivedDataPath build-ipa CODE_SIGNING_ALLOWED=NO CODE_SIGNING_REQUIRED=NO CODE_SIGN_IDENTITY="" build
+      - name: Package IPA
+        run: |
+          set -euo pipefail
+          mkdir -p dist/Payload
+          ditto build-ipa/Build/Products/Release-iphoneos/TVDrop.app dist/Payload/TVDrop.app
+          cd dist
+          zip -qry TVDrop-unsigned.ipa Payload
+          unzip -t TVDrop-unsigned.ipa
+      - uses: actions/upload-artifact@v4
+        with:
+          name: TVDrop-IPA
+          path: TVDrop/dist/TVDrop-unsigned.ipa
+          if-no-files-found: error
